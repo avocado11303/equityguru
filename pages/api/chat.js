@@ -1,14 +1,12 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import yahooFinance from "yahoo-finance2";
 
-export const config = {
-  runtime: "nodejs",
-};
+export const config = { runtime: "nodejs" };
 
 // In-memory conversation history
 let conversationHistory = [];
 
-// Simple stock name → Yahoo Finance symbol mapping
+// Top 30 Indian stocks mapping
 const stockMap = {
   "reliance": "RELIANCE.NS",
   "tcs": "TCS.NS",
@@ -36,16 +34,12 @@ const stockMap = {
   "indusind": "INDUSINDBK.NS",
   "grasim": "GRASIM.NS",
   "bpcl": "BPCL.NS",
-  "ntpc": "NTPC.NS",
   "bharat forge": "BHARATFORG.NS",
-  "shree cement": "SHREECEM.NS",
-  "hcl": "HCLTECH.NS"
+  "shree cement": "SHREECEM.NS"
 };
 
 export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ message: "Method not allowed" });
-  }
+  if (req.method !== "POST") return res.status(405).json({ message: "Method not allowed" });
 
   const { message } = req.body;
   if (!message) return res.status(400).json({ message: "Message required" });
@@ -56,22 +50,17 @@ export default async function handler(req, res) {
 
     let stockDataText = "";
 
-    // 1️⃣ Detect stock name in user message
+    // Detect stock name in user message
     const nameMatch = Object.keys(stockMap).find((name) =>
       message.toLowerCase().includes(name)
     );
 
     if (nameMatch) {
       const symbol = stockMap[nameMatch];
-
       try {
-        // 2️⃣ Fetch live stock data from Yahoo Finance
         const quote = await yahooFinance.quote(symbol);
-
         if (quote && quote.regularMarketPrice) {
-          stockDataText = `Current price for ${quote.longName} (${symbol}): ₹${quote.regularMarketPrice}, Open = ₹${quote.regularMarketOpen}, High = ₹${quote.regularMarketDayHigh}, Low = ₹${quote.regularMarketDayLow}, Change = ₹${quote.regularMarketChange} (${quote.regularMarketChangePercent.toFixed(
-            2
-          )}%)`;
+          stockDataText = `**${quote.longName} (${symbol})**\n- Current Price: ₹${quote.regularMarketPrice}\n- Open: ₹${quote.regularMarketOpen}\n- High: ₹${quote.regularMarketDayHigh}\n- Low: ₹${quote.regularMarketDayLow}\n- Change: ₹${quote.regularMarketChange} (${quote.regularMarketChangePercent.toFixed(2)}%)`;
         } else {
           stockDataText = `Could not fetch live stock price for ${symbol}.`;
         }
@@ -81,21 +70,20 @@ export default async function handler(req, res) {
       }
     }
 
-    // 3️⃣ System / persona prompt
+    // Concise system prompt
     const systemPrompt = `
-You are StockSage, an AI assistant specialized in Indian stock market (NSE & BSE).
-Respond only about Indian stocks.
-Provide concise, structured, and expert answers in Markdown format.
-Include headings, bullets, and plain language. Avoid general AI chatter.
+You are EquityGuru, an AI assistant specialized in Indian stock market (NSE & BSE).
+Answer concisely in **3-5 sentences maximum**.
+Provide structured, expert responses in Markdown format with headings and bullets.
+Do NOT give long paragraphs or unrelated information.
 `;
 
-    // 4️⃣ Prepare conversation context
+    // Prepare last 5 messages as context
     const context = conversationHistory
       .slice(-5)
       .map((msg) => `${msg.role}: ${msg.content}`)
       .join("\n");
 
-    // 5️⃣ Combine system prompt + context + user message + stock data
     const finalPrompt = `
 ${systemPrompt}
 
@@ -104,14 +92,13 @@ ${context}
 
 User asked: "${message}"
 
-${stockDataText ? "Here is live stock data:\n" + stockDataText : ""}
+${stockDataText ? "Live Stock Data:\n" + stockDataText : ""}
 `;
 
-    // 6️⃣ Call Gemini API
     const result = await model.generateContent(finalPrompt);
     const aiMessage = result.response.text();
 
-    // 7️⃣ Update conversation history
+    // Update conversation history
     conversationHistory.push({ role: "user", content: message });
     conversationHistory.push({ role: "assistant", content: aiMessage });
 

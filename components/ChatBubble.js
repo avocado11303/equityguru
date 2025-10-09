@@ -14,7 +14,7 @@ const ChatBubble = ({ message, isUser }) => {
           display: "inline-block",
           padding: "10px",
           borderRadius: "10px",
-          backgroundColor: isUser ? "#4CAF50" : "#e0e0e0",
+          backgroundColor: isUser ? "#c54e4b" : "#e0e0e0",
           color: isUser ? "white" : "black",
           maxWidth: "70%",
           textAlign: "left",
